@@ -4,8 +4,10 @@
 #include "config/config_limits.h"
 #include "config/widget_setting_value.h"
 #include "core/input/key_chord.h"
+#include "core/input/keybind_action.h"
 #include "system/sysmon_threshold_profile.h"
 #include "ui/style.h"
+#include "ui/surface_shadow.h"
 
 #include <array>
 #include <cstddef>
@@ -23,6 +25,10 @@ struct WaylandOutput;
 // Direction hidden accordion members unfold relative to the always-visible first member, along the
 // bar lane's main axis.
 enum class BarAccordionDirection : std::uint8_t { End = 0, Start = 1 };
+
+// Shared defaults for hover reveals in the bar (capsule group accordion and widget peek).
+inline constexpr std::int32_t kBarRevealDelayMs = 100;
+inline constexpr std::int32_t kBarRevealDurationMs = static_cast<std::int32_t>(Style::animNormal);
 
 // A capsule group: an ordered set of member widgets sharing one capsule + style. `id` is opaque and
 // auto-generated. A group appears in a bar lane as a single token (see makeCapsuleGroupToken); its
@@ -44,9 +50,9 @@ struct BarCapsuleGroupStyle {
   // Collapse the group to its first member; hovering the capsule reveals the rest inline.
   bool accordion = false;
   BarAccordionDirection accordionDirection = BarAccordionDirection::End;
-  // Unfold animation time in milliseconds; unset means the default (Style::animNormal).
+  // Unfold animation time in milliseconds; unset means kBarRevealDurationMs.
   std::optional<std::int32_t> accordionDurationMs;
-  // Hover time in milliseconds before unfolding starts; unset/0 reacts at once.
+  // Hover time in milliseconds before unfolding starts; unset means kBarRevealDelayMs, 0 reacts at once.
   std::optional<std::int32_t> accordionDelayMs;
   // Gap between members inside the capsule, in logical pixels; unset inherits the bar's widget_spacing.
   std::optional<std::int32_t> widgetSpacing;
@@ -396,20 +402,6 @@ struct ResolvedIdleBehavior {
 void normalizeIdleBehaviorAction(IdleBehaviorConfig& behavior);
 ResolvedIdleBehavior resolveIdleBehaviorActions(const IdleBehaviorConfig& behavior);
 
-enum class KeybindAction : std::uint8_t {
-  Validate = 0,
-  Cancel = 1,
-  Left = 2,
-  Right = 3,
-  Up = 4,
-  Down = 5,
-  TabNext = 6,
-  TabPrevious = 7,
-  Delete = 8,
-  Copy = 9,
-  Save = 10,
-};
-
 std::vector<KeyChord> defaultKeybindSet(KeybindAction action);
 
 using ConfigOverrideValue = std::variant<
@@ -441,9 +433,9 @@ struct WidgetBarCapsuleSpec {
   // Accordion mode (capsule groups only): collapse to the first member; hover expands.
   bool accordion = false;
   BarAccordionDirection accordionDirection = BarAccordionDirection::End;
-  // Accordion unfold animation time in milliseconds; unset means the default (Style::animNormal).
+  // Accordion unfold animation time in milliseconds; unset means kBarRevealDurationMs.
   std::optional<float> accordionDurationMs;
-  // Accordion hover time in milliseconds before unfolding starts; unset/0 reacts at once.
+  // Accordion hover time in milliseconds before unfolding starts; unset means kBarRevealDelayMs, 0 reacts at once.
   std::optional<float> accordionDelayMs;
   // Gap between group members; unset inherits the bar's widget_spacing. Meaningless for single widgets.
   std::optional<float> widgetSpacing;
@@ -595,9 +587,10 @@ struct WallpaperConfig {
   float transitionDurationMs = 1500.0F;
   float edgeSmoothness = 0.3F;
   bool transitionOnStartup = false;
-  std::string directory;      // empty = XDG_PICTURES_DIR
-  std::string directoryLight; // empty = directory
-  std::string directoryDark;  // empty = directory
+  bool syncTransitions = true; // all monitors share one random effect per change batch
+  std::string directory;       // empty = XDG_PICTURES_DIR
+  std::string directoryLight;  // empty = directory
+  std::string directoryDark;   // empty = directory
   bool perMonitorDirectories = false;
   WallpaperAutomationConfig automation;
   std::vector<WallpaperMonitorOverride> monitorOverrides;
@@ -713,6 +706,7 @@ struct DockMonitorOverride {
   std::optional<DockEdge> position;
   std::optional<bool> activeMonitorOnly;
   std::optional<std::int32_t> iconSize;
+  std::optional<bool> iconShadow;
   std::optional<float> iconSaturation;
   std::optional<bool> colorizeIcons;
   std::optional<std::int32_t> mainAxisPadding;
@@ -734,6 +728,7 @@ struct DockMonitorOverride {
   std::optional<bool> showRunning;
   std::optional<bool> autoHide;
   std::optional<bool> smartAutoHide;
+  std::optional<std::int32_t> autoHideRevealDelayMs;
   std::optional<std::string> layer;
   std::optional<bool> reserveSpace;
   std::optional<float> activeScale;
@@ -756,7 +751,8 @@ struct DockMonitorOverride {
 struct DockConfig {
   bool enabled = false; // opt-in; dock is hidden by default
   DockEdge position = DockEdge::Bottom;
-  bool activeMonitorOnly = false;    // render only on preferred active output
+  bool activeMonitorOnly = false; // render only on preferred active output
+  bool iconShadow = false;
   std::int32_t iconSize = 48;        // icon size in pixels (before ui_scale)
   std::int32_t mainAxisPadding = 16; // inner padding along the icon row (main axis)
   std::int32_t crossAxisPadding = 8; // inner padding perpendicular to the icon row
@@ -766,19 +762,20 @@ struct DockConfig {
   // Inside outline for the dock background.
   ColorSpec border = colorSpecFromRole(ColorRole::OutlineVariant);
   float borderWidth = 0.0F;
-  std::int32_t radius = 16;            // dock background corner radius
-  std::int32_t radiusTopLeft = 16;     // dock background top-left corner radius
-  std::int32_t radiusTopRight = 16;    // dock background top-right corner radius
-  std::int32_t radiusBottomLeft = 16;  // dock background bottom-left corner radius
-  std::int32_t radiusBottomRight = 16; // dock background bottom-right corner radius
-  bool concaveEdgeCorners = true;      // carve concave corners on the side that touches the screen edge
-  std::int32_t marginEnds = 0;         // inset from each end of the dock along its main axis
-  std::int32_t marginEdge = 0;         // distance from the nearest screen edge (floats the dock when > 0)
-  bool shadow = true;                  // use the global shell shadow
-  bool showRunning = true;             // also show running apps not in pinned list
-  bool autoHide = false;               // slide out when not hovered (overlay mode)
-  bool smartAutoHide = false;          // hide while the active workspace has windows; show when it is empty
-  std::string layer = "top";           // top | overlay
+  std::int32_t radius = 16;                 // dock background corner radius
+  std::int32_t radiusTopLeft = 16;          // dock background top-left corner radius
+  std::int32_t radiusTopRight = 16;         // dock background top-right corner radius
+  std::int32_t radiusBottomLeft = 16;       // dock background bottom-left corner radius
+  std::int32_t radiusBottomRight = 16;      // dock background bottom-right corner radius
+  bool concaveEdgeCorners = true;           // carve concave corners on the side that touches the screen edge
+  std::int32_t marginEnds = 0;              // inset from each end of the dock along its main axis
+  std::int32_t marginEdge = 0;              // distance from the nearest screen edge (floats the dock when > 0)
+  bool shadow = true;                       // use the global shell shadow
+  bool showRunning = true;                  // also show running apps not in pinned list
+  bool autoHide = false;                    // slide out when not hovered (overlay mode)
+  bool smartAutoHide = false;               // hide while the active workspace has windows; show when it is empty
+  std::int32_t autoHideRevealDelayMs = 250; // pointer dwell on the edge strip before revealing; 0 reveals immediately
+  std::string layer = "top";                // top | overlay
 
   constexpr bool isAutoHideEnabled() const noexcept { return autoHide || smartAutoHide; }
   bool reserveSpace = true;         // reserve compositor exclusive zone; applies with or without auto_hide
@@ -900,6 +897,7 @@ struct NotificationConfig {
   bool showAppName = true;
   bool colorizeIcons = false;
   bool showActions = true;
+  bool groupByApp = true;
   std::string position = "top_right";
   std::string layer = "top"; // top | overlay
   float scale = 1.0F;
@@ -912,6 +910,7 @@ struct NotificationConfig {
   int offsetX = 20; // absolute horizontal margin from the screen edge
   int offsetY = 8;  // absolute vertical margin from the screen edge
   std::vector<std::string> monitors;
+  bool newestOnEdge = false;
   bool collapseOnDismiss = true;
   bool keepDismissedInHistory = true;
   int historyRetentionHours = 0;
@@ -962,18 +961,6 @@ constexpr EnumOption<PasswordMaskStyle> kPasswordMaskStyles[] = {
     {PasswordMaskStyle::RandomIcons, "random", "settings.options.shell.password-style.random-icons"},
 };
 
-enum class ShadowDirection : std::uint8_t {
-  Center = 0,
-  Down = 1,
-  Up = 2,
-  Left = 3,
-  Right = 4,
-  DownLeft = 5,
-  DownRight = 6,
-  UpLeft = 7,
-  UpRight = 8,
-};
-
 constexpr EnumOption<ShadowDirection> kShadowDirections[] = {
     {ShadowDirection::Center, "center", "settings.options.shell.shadow-direction.center"},
     {ShadowDirection::Down, "down", "settings.options.shell.shadow-direction.down"},
@@ -985,35 +972,6 @@ constexpr EnumOption<ShadowDirection> kShadowDirections[] = {
     {ShadowDirection::UpLeft, "up_left", "settings.options.shell.shadow-direction.up-left"},
     {ShadowDirection::UpRight, "up_right", "settings.options.shell.shadow-direction.up-right"},
 };
-
-struct ShadowDirectionOffset {
-  std::int32_t x;
-  std::int32_t y;
-};
-
-constexpr ShadowDirectionOffset shadowDirectionOffset(ShadowDirection dir) noexcept {
-  switch (dir) {
-  case ShadowDirection::Center:
-    return {0, 0};
-  case ShadowDirection::Down:
-    return {0, 2};
-  case ShadowDirection::Up:
-    return {0, -2};
-  case ShadowDirection::Left:
-    return {-2, 0};
-  case ShadowDirection::Right:
-    return {2, 0};
-  case ShadowDirection::DownLeft:
-    return {-2, 2};
-  case ShadowDirection::DownRight:
-    return {2, 2};
-  case ShadowDirection::UpLeft:
-    return {-2, -2};
-  case ShadowDirection::UpRight:
-    return {2, -2};
-  }
-  return {0, 2};
-}
 
 enum class PanelTransparencyMode : std::uint8_t {
   Solid = 0,
@@ -1161,13 +1119,6 @@ struct ShellConfig {
     float speed = 1.0F;
 
     bool operator==(const AnimationConfig&) const = default;
-  };
-
-  struct ShadowConfig {
-    ShadowDirection direction = ShadowDirection::Down;
-    float alpha = 0.55F;
-
-    bool operator==(const ShadowConfig&) const = default;
   };
 
   struct PanelConfig {
@@ -1425,7 +1376,7 @@ struct ShellConfig {
   bool disableMipmaps = false;
   ClipboardAutoPasteMode clipboardAutoPaste = ClipboardAutoPasteMode::Auto;
   std::string clipboardImageActionCommand;
-  ShadowConfig shadow;
+  ShadowStyle shadow;
   PanelConfig panel;
   LauncherConfig launcher;
   WindowSwitcherConfig windowSwitcher;
@@ -1802,6 +1753,18 @@ constexpr EnumOption<ShellThemeMode> kShellThemeModes[] = {
     {ShellThemeMode::Auto, "auto", "common.states.auto"},
 };
 
+// How wallpaper-generated themes pick their ANSI colors. `palette` takes them from the scheme
+// roles so they match the wallpaper; `standard` keeps canonical red, green, yellow hues.
+enum class TerminalColors : std::uint8_t {
+  Palette = 0,
+  Standard = 1,
+};
+
+constexpr EnumOption<TerminalColors> kTerminalColorsOptions[] = {
+    {TerminalColors::Palette, "palette", "settings.options.theme.terminal-colors.palette"},
+    {TerminalColors::Standard, "standard", "settings.options.theme.terminal-colors.standard"},
+};
+
 struct WallpaperFavorite {
   std::string path;
   std::optional<ThemeMode> themeMode;
@@ -1889,6 +1852,7 @@ struct ThemeConfig {
   ThemeMode mode = ThemeMode::Dark;
   ShellThemeMode shellMode = ShellThemeMode::Follow;
   bool pureBlackDark = false;
+  TerminalColors terminalColors = TerminalColors::Palette;
   bool syncColorScheme = true;
   TemplatesConfig templates;
 

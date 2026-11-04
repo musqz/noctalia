@@ -5,6 +5,7 @@
 #include "core/deferred_call.h"
 #include "core/log.h"
 #include "core/process/process.h"
+#include "launcher/fuzzy_match.h"
 #include "lua.h"
 #include "luacode.h"
 #include "lualib.h"
@@ -18,6 +19,7 @@
 #include "scripting/script_api_context.h"
 #include "scripting/script_io_pool.h"
 #include "scripting/ui_handler_table.h"
+#include "shell/dialogs/color_picker_dialog.h"
 #include "system/app_identity.h"
 #include "system/desktop_entry.h"
 #include "system/disk_mounts.h"
@@ -25,10 +27,8 @@
 #include "system/system_monitor_service.h"
 #include "system/terminal_launch.h"
 #include "time/time_format.h"
-#include "ui/dialogs/color_picker_dialog.h"
 #include "ui/palette.h"
 #include "util/file_utils.h"
-#include "util/fuzzy_match.h"
 #include "util/string_utils.h"
 
 #include <algorithm>

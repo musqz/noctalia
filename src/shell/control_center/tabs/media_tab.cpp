@@ -13,10 +13,10 @@
 #include "shell/control_center/tab.h"
 #include "shell/panel/panel_button_style.h"
 #include "shell/panel/panel_manager.h"
+#include "shell/visuals/audio_visualizer.h"
 #include "ui/builders.h"
 #include "ui/controls/context_menu.h"
 #include "ui/controls/context_menu_popup.h"
-#include "ui/visuals/audio_visualizer.h"
 
 #include <algorithm>
 #include <chrono>
@@ -161,7 +161,7 @@ void MediaTab::openPlayerMenu() {
               },
           .parent =
               PopupSurfaceParent{
-                  .layerSurface = parentCtx->layerSurface,
+                  .attach = parentCtx->attach,
                   .output = parentCtx->output,
               },
           .pointerParentSurface = parentCtx->surface,
@@ -651,7 +651,7 @@ void MediaTab::doUpdate(Renderer& renderer) {
   refresh(renderer);
 }
 
-void MediaTab::onFrameTick(float deltaMs) {
+void MediaTab::onFrameTick(float deltaMs, Renderer& /*renderer*/) {
   if (!m_active || !m_showVisualizer) {
     return;
   }

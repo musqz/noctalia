@@ -6,7 +6,7 @@
 #include "shell/bar/bar_services.h"
 #include "shell/bar/widget_action_dispatcher.h"
 #include "shell/bar/widget_factory.h"
-#include "ui/dialogs/layer_popup_host.h"
+#include "shell/dialogs/layer_popup_host.h"
 #include "wayland/surface.h"
 
 #include <chrono>
@@ -141,6 +141,8 @@ private:
   void animateWidgetHoverHighlight(BarInstance& instance, Widget& widget, bool hovered);
   void updateAccordionExpansion(BarInstance& instance, InputArea* hoveredArea);
   void beginAccordionAnimation(BarInstance& instance, BarCapsuleRun& run, bool expanded);
+  void updateWidgetPeek(BarInstance& instance, InputArea* hoveredArea);
+  void beginWidgetPeekAnimation(BarInstance& instance, Widget& widget, bool expanded);
   void rebuildInstanceContents(BarInstance& instance, const BarConfig& newConfig);
   BarServices services() const;
   void buildScene(BarInstance& instance, std::uint32_t width, std::uint32_t height);
@@ -213,7 +215,7 @@ private:
   // triggered by unrelated config changes (theme, weather, idle, etc.).
   std::vector<BarConfig> m_lastBars;
   std::unordered_map<std::string, WidgetConfig> m_lastWidgets;
-  ShellConfig::ShadowConfig m_lastShadow;
+  ShadowStyle m_lastShadow;
   // Plugin enable/disable changes which widget types resolve, so a plugins-only
   // config change must also rebuild widgets.
   PluginsConfig m_lastPlugins;

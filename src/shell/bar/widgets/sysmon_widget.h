@@ -2,9 +2,9 @@
 
 #include "core/frame_rate_limiter.h"
 #include "core/timer_manager.h"
+#include "render/scene/tooltip_content.h"
 #include "shell/bar/widget.h"
 #include "shell/bar/widget_custom_image.h"
-#include "shell/tooltip/tooltip_content.h"
 #include "system/format_units.h"
 #include "ui/controls/flex.h"
 #include "ui/palette.h"
@@ -46,7 +46,6 @@ enum class SysmonStat {
   NetTx
 };
 enum class SysmonVisualization { Graph, Gauge, None };
-enum class SysmonGlyphPosition { Before, After };
 
 class SysmonWidget : public Widget {
 public:
@@ -68,7 +67,9 @@ public:
     bool showValue = true;
     int labelMinWidth = 0;
     bool showUnits = true;
-    SysmonGlyphPosition glyphPosition = SysmonGlyphPosition::Before;
+    GlyphPosition glyphPosition = GlyphPosition::Before;
+    bool peek = false;
+    int peekDelayMs = kBarRevealDelayMs;
   };
 
   SysmonWidget(SystemMonitorService* monitor, ConfigService& configService, Options options);
@@ -128,7 +129,7 @@ private:
   std::string m_customLabelText;
   WidgetCustomImage m_customImage;
   bool m_showUnits;
-  SysmonGlyphPosition m_glyphPosition;
+  GlyphPosition m_glyphPosition;
   std::string m_lastRawValue;
   bool m_isVerticalBar = false;
   bool m_lastLabelVertical = false;

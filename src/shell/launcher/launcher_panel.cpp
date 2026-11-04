@@ -9,17 +9,18 @@
 #include "cursor-shape-v1-client-protocol.h"
 #include "i18n/i18n.h"
 #include "launcher/app_provider.h"
+#include "launcher/fuzzy_match.h"
 #include "render/animation/animation_manager.h"
 #include "render/core/async_texture_cache.h"
 #include "render/core/renderer.h"
 #include "render/scene/input_area.h"
 #include "render/scene/node.h"
+#include "shell/app_icon_colorization_settings.h"
 #include "shell/dock/pinned_apps.h"
 #include "shell/panel/panel_manager.h"
 #include "shell/profile/avatar_path.h"
 #include "system/desktop_entry.h"
 #include "system/distro_info.h"
-#include "ui/app_icon_colorization.h"
 #include "ui/builders.h"
 #include "ui/controls/context_menu_popup.h"
 #include "ui/controls/scroll_view.h"
@@ -27,7 +28,6 @@
 #include "ui/palette.h"
 #include "ui/signal.h"
 #include "ui/style.h"
-#include "util/fuzzy_match.h"
 #include "util/string_utils.h"
 
 #include <algorithm>
@@ -3610,7 +3610,7 @@ bool LauncherPanel::openAppActionsMenu(std::size_t index, float anchorX, float a
                   .height = std::max(1, ah),
               },
           .parent = PopupSurfaceParent{
-              .layerSurface = parentCtx->layerSurface,
+              .attach = parentCtx->attach,
               .output = parentCtx->output,
           },
       }

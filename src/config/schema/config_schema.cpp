@@ -1408,6 +1408,7 @@ namespace noctalia::config::schema {
         enumField(&ThemeConfig::mode, "mode", kThemeModes),
         enumField(&ThemeConfig::shellMode, "shell_mode", kShellThemeModes),
         field(&ThemeConfig::pureBlackDark, "pure_black_dark"),
+        enumField(&ThemeConfig::terminalColors, "terminal_colors", kTerminalColorsOptions),
         field(&ThemeConfig::syncColorScheme, "sync_color_scheme"),
         subTable(&ThemeConfig::templates, "templates", templatesSchema()),
     };
@@ -1893,6 +1894,7 @@ namespace noctalia::config::schema {
         field(&WallpaperConfig::transitionDurationMs, "transition_duration", kWallpaperTransitionDurationRange),
         field(&WallpaperConfig::edgeSmoothness, "edge_smoothness", kUnitRange),
         field(&WallpaperConfig::transitionOnStartup, "transition_on_startup"),
+        field(&WallpaperConfig::syncTransitions, "sync_transitions"),
         pathStringField(&WallpaperConfig::directory, "directory"),
         pathStringField(&WallpaperConfig::directoryLight, "directory_light"),
         pathStringField(&WallpaperConfig::directoryDark, "directory_dark"),
@@ -2437,6 +2439,9 @@ namespace noctalia::config::schema {
           optionalBoolField(&DockMonitorOverride::showRunning, "show_running"),
           optionalBoolField(&DockMonitorOverride::autoHide, "auto_hide"),
           optionalBoolField(&DockMonitorOverride::smartAutoHide, "smart_auto_hide"),
+          optionalIntField(
+              &DockMonitorOverride::autoHideRevealDelayMs, "auto_hide_reveal_delay_ms", kDockAutoHideRevealDelayMsRange
+          ),
           custom<DockMonitorOverride>(
               "layer",
               [](const toml::table& tbl, DockMonitorOverride& out, std::string_view parentPath, Diagnostics& diag) {
@@ -2522,6 +2527,7 @@ namespace noctalia::config::schema {
         field(&DockConfig::showRunning, "show_running"),
         field(&DockConfig::autoHide, "auto_hide"),
         field(&DockConfig::smartAutoHide, "smart_auto_hide"),
+        field(&DockConfig::autoHideRevealDelayMs, "auto_hide_reveal_delay_ms", kDockAutoHideRevealDelayMsRange),
         custom<DockConfig>(
             "layer",
             [](const toml::table& tbl, DockConfig& out, std::string_view parentPath, Diagnostics& diag) {

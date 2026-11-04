@@ -53,11 +53,11 @@ Direct project dependencies are listed below; transitive dependencies are owned 
 
 Run `just format` before committing and `just format-check` to check. Both run a code half (`format-code`, `format-code-check`) and a docs half (`format-docs`, `format-docs-check`), which you can also run on their own.
 
-Code formatting accepts [clang-format](https://clang.llvm.org/docs/ClangFormat.html) 22 or newer and covers `lib/`, `src/`, and `tests/`. The code recipes reject formatter versions older than 22 and print the version in use.
+Code formatting accepts [clang-format](https://clang.llvm.org/docs/ClangFormat.html) 23 or newer and covers `lib/`, `src/`, and `tests/`. The code recipes reject formatter versions older than 23 and print the version in use.
 
-CI runs `just format-code-check` on Arch with clang-format 22. Newer versions may produce different formatting, so a local check with a newer formatter does not guarantee CI will pass. Use version 22 to reproduce or resolve CI formatting failures.
+CI runs `just format-code-check` and `just lint` on Arch with clang-format and clang-tidy 23, and fails if the installed major differs. Newer versions may produce different formatting or diagnostics, so a local check with a newer toolchain does not guarantee CI will pass. Use version 23 to reproduce or resolve CI formatting and lint failures.
 
-For CI parity, install `clang22` on Arch or `clang-tools-extra` on Fedora 44. If your distribution installs Clang 22 outside the default PATH, prepend its binary directory when running either recipe, for example `PATH=/usr/lib/llvm22/bin:$PATH just format-code-check` on Arch. Keep editor formatting on the same version as your command-line formatter.
+For CI parity, install `clang` on Arch (currently 23). If your distribution installs Clang 23 outside the default PATH, prepend its binary directory when running either recipe, for example `PATH=/usr/lib/llvm23/bin:$PATH just format-code-check`. Keep editor formatting on the same version as your command-line formatter.
 
 Markdown and MDX files are formatted by `tools/remark/format.mjs`, which parses them with the same remark plugins as the docs site (MDX, GFM, directives, custom heading ids, frontmatter) plus math, so it reads every file as the site and GitHub render it. Its dependencies are pinned in `tools/remark/package-lock.json`; the docs recipes need Node.js and npm and install them into `tools/remark/node_modules` on first use. Do not hard-wrap prose: the formatter writes each paragraph, list item, and table cell on one line, keeping GitHub alert markers (`> [!NOTE]`) on their own line. It refuses to write a result whose parsed document differs from the input beyond whitespace. CI runs `just format-docs-check`.
 
@@ -197,7 +197,6 @@ lib/                Shared UI library (noctalia-ui); built without src/ on its i
     text/           Cairo/Pango text and glyph rendering
   ui/
     controls/       Reusable controls (Button, Input, Label, Select, Slider, Box, ...)
-    dialogs/        File, color, and glyph picker dialogs
   util/             Generic helpers
   wayland/          Wayland connection, registry extensions, seats, xdg toplevel/popup/sub surfaces, text input
 src/
@@ -226,7 +225,7 @@ src/
   hooks/            User hook state and hook manager
   idle/             Idle manager, inhibitor, grace overlay
   ipc/              IPC client/service, CLI command parsing, plugin pixel stream companion protocol
-  launcher/         Launcher providers (apps, emoji, calculator, sessions, windows, plugins)
+  launcher/         Launcher providers (apps, emoji, calculator, sessions, windows, plugins), fuzzy matching
   net/              HTTP client, URI parsing, URL opening
   notification/     Notification model, manager, filtering, history
   pipewire/         PipeWire audio service, sound playback, spectrum analyzer
@@ -237,8 +236,10 @@ src/
       widgets/      Bar widget implementations
     clipboard/      Clipboard history panel and paste helpers
     control_center/ Control center panel, tabs, shortcut registry
+    controls/       Shell-owned controls: markdown view, search picker, color and glyph pickers
     desktop/        Desktop widget host, factory, layout, editor support
       widgets/      Desktop widget implementations
+    dialogs/        Dialog popup hosts; file, color, glyph, and search picker dialogs
     dock/           Dock surface, model, pinned apps, context menu
     greeter/        Greeter appearance sync
     launcher/       Launcher panel
@@ -261,9 +262,9 @@ src/
     wallpaper/      Wallpaper surfaces, paths, picker panel
     wayland/        Shell-only Wayland extensions: layer shell and layer surfaces, blur, toplevels, workspaces, clipboard, capture, idle, output heads, focus grab
     widgets_editor/ Background widget editor
-  system/           Desktop entries, brightness, weather, location, system monitor, hardware services
+  system/           Desktop entries, directory scanning, brightness, weather, location, system monitor, hardware services
   theme/            Palette generation, templates, theme service, template application
-  time/             Time service and polling
+  time/             Time service, polling, and time formatting
 assets/
   fonts/            Bundled Noctalia Tabler and UI fonts
   sounds/           Notification and UI sounds

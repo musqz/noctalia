@@ -26,6 +26,10 @@ struct WaylandOutput;
 // bar lane's main axis.
 enum class BarAccordionDirection : std::uint8_t { End = 0, Start = 1 };
 
+// Shared defaults for hover reveals in the bar (capsule group accordion and widget peek).
+inline constexpr std::int32_t kBarRevealDelayMs = 100;
+inline constexpr std::int32_t kBarRevealDurationMs = static_cast<std::int32_t>(Style::animNormal);
+
 // A capsule group: an ordered set of member widgets sharing one capsule + style. `id` is opaque and
 // auto-generated. A group appears in a bar lane as a single token (see makeCapsuleGroupToken); its
 // members live inside the group, not loose in the lane.
@@ -46,9 +50,9 @@ struct BarCapsuleGroupStyle {
   // Collapse the group to its first member; hovering the capsule reveals the rest inline.
   bool accordion = false;
   BarAccordionDirection accordionDirection = BarAccordionDirection::End;
-  // Unfold animation time in milliseconds; unset means the default (Style::animNormal).
+  // Unfold animation time in milliseconds; unset means kBarRevealDurationMs.
   std::optional<std::int32_t> accordionDurationMs;
-  // Hover time in milliseconds before unfolding starts; unset/0 reacts at once.
+  // Hover time in milliseconds before unfolding starts; unset means kBarRevealDelayMs, 0 reacts at once.
   std::optional<std::int32_t> accordionDelayMs;
   // Gap between members inside the capsule, in logical pixels; unset inherits the bar's widget_spacing.
   std::optional<std::int32_t> widgetSpacing;
@@ -429,9 +433,9 @@ struct WidgetBarCapsuleSpec {
   // Accordion mode (capsule groups only): collapse to the first member; hover expands.
   bool accordion = false;
   BarAccordionDirection accordionDirection = BarAccordionDirection::End;
-  // Accordion unfold animation time in milliseconds; unset means the default (Style::animNormal).
+  // Accordion unfold animation time in milliseconds; unset means kBarRevealDurationMs.
   std::optional<float> accordionDurationMs;
-  // Accordion hover time in milliseconds before unfolding starts; unset/0 reacts at once.
+  // Accordion hover time in milliseconds before unfolding starts; unset means kBarRevealDelayMs, 0 reacts at once.
   std::optional<float> accordionDelayMs;
   // Gap between group members; unset inherits the bar's widget_spacing. Meaningless for single widgets.
   std::optional<float> widgetSpacing;
@@ -583,9 +587,10 @@ struct WallpaperConfig {
   float transitionDurationMs = 1500.0F;
   float edgeSmoothness = 0.3F;
   bool transitionOnStartup = false;
-  std::string directory;      // empty = XDG_PICTURES_DIR
-  std::string directoryLight; // empty = directory
-  std::string directoryDark;  // empty = directory
+  bool syncTransitions = true; // all monitors share one random effect per change batch
+  std::string directory;       // empty = XDG_PICTURES_DIR
+  std::string directoryLight;  // empty = directory
+  std::string directoryDark;   // empty = directory
   bool perMonitorDirectories = false;
   WallpaperAutomationConfig automation;
   std::vector<WallpaperMonitorOverride> monitorOverrides;
@@ -723,6 +728,7 @@ struct DockMonitorOverride {
   std::optional<bool> showRunning;
   std::optional<bool> autoHide;
   std::optional<bool> smartAutoHide;
+  std::optional<std::int32_t> autoHideRevealDelayMs;
   std::optional<std::string> layer;
   std::optional<bool> reserveSpace;
   std::optional<float> activeScale;
@@ -756,19 +762,20 @@ struct DockConfig {
   // Inside outline for the dock background.
   ColorSpec border = colorSpecFromRole(ColorRole::OutlineVariant);
   float borderWidth = 0.0F;
-  std::int32_t radius = 16;            // dock background corner radius
-  std::int32_t radiusTopLeft = 16;     // dock background top-left corner radius
-  std::int32_t radiusTopRight = 16;    // dock background top-right corner radius
-  std::int32_t radiusBottomLeft = 16;  // dock background bottom-left corner radius
-  std::int32_t radiusBottomRight = 16; // dock background bottom-right corner radius
-  bool concaveEdgeCorners = true;      // carve concave corners on the side that touches the screen edge
-  std::int32_t marginEnds = 0;         // inset from each end of the dock along its main axis
-  std::int32_t marginEdge = 0;         // distance from the nearest screen edge (floats the dock when > 0)
-  bool shadow = true;                  // use the global shell shadow
-  bool showRunning = true;             // also show running apps not in pinned list
-  bool autoHide = false;               // slide out when not hovered (overlay mode)
-  bool smartAutoHide = false;          // hide while the active workspace has windows; show when it is empty
-  std::string layer = "top";           // top | overlay
+  std::int32_t radius = 16;                 // dock background corner radius
+  std::int32_t radiusTopLeft = 16;          // dock background top-left corner radius
+  std::int32_t radiusTopRight = 16;         // dock background top-right corner radius
+  std::int32_t radiusBottomLeft = 16;       // dock background bottom-left corner radius
+  std::int32_t radiusBottomRight = 16;      // dock background bottom-right corner radius
+  bool concaveEdgeCorners = true;           // carve concave corners on the side that touches the screen edge
+  std::int32_t marginEnds = 0;              // inset from each end of the dock along its main axis
+  std::int32_t marginEdge = 0;              // distance from the nearest screen edge (floats the dock when > 0)
+  bool shadow = true;                       // use the global shell shadow
+  bool showRunning = true;                  // also show running apps not in pinned list
+  bool autoHide = false;                    // slide out when not hovered (overlay mode)
+  bool smartAutoHide = false;               // hide while the active workspace has windows; show when it is empty
+  std::int32_t autoHideRevealDelayMs = 250; // pointer dwell on the edge strip before revealing; 0 reveals immediately
+  std::string layer = "top";                // top | overlay
 
   constexpr bool isAutoHideEnabled() const noexcept { return autoHide || smartAutoHide; }
   bool reserveSpace = true;         // reserve compositor exclusive zone; applies with or without auto_hide
@@ -1746,6 +1753,18 @@ constexpr EnumOption<ShellThemeMode> kShellThemeModes[] = {
     {ShellThemeMode::Auto, "auto", "common.states.auto"},
 };
 
+// How wallpaper-generated themes pick their ANSI colors. `palette` takes them from the scheme
+// roles so they match the wallpaper; `standard` keeps canonical red, green, yellow hues.
+enum class TerminalColors : std::uint8_t {
+  Palette = 0,
+  Standard = 1,
+};
+
+constexpr EnumOption<TerminalColors> kTerminalColorsOptions[] = {
+    {TerminalColors::Palette, "palette", "settings.options.theme.terminal-colors.palette"},
+    {TerminalColors::Standard, "standard", "settings.options.theme.terminal-colors.standard"},
+};
+
 struct WallpaperFavorite {
   std::string path;
   std::optional<ThemeMode> themeMode;
@@ -1833,6 +1852,7 @@ struct ThemeConfig {
   ThemeMode mode = ThemeMode::Dark;
   ShellThemeMode shellMode = ShellThemeMode::Follow;
   bool pureBlackDark = false;
+  TerminalColors terminalColors = TerminalColors::Palette;
   bool syncColorScheme = true;
   TemplatesConfig templates;
 

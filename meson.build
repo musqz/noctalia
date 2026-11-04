@@ -356,8 +356,7 @@ _noctalia_cpp_args = [
 ] + _noctalia_compile_definitions
 
 # ── UI library ────────────────────────────────────────────────────────────────
-# Provides noctalia_ui_lib, noctalia_ui_dep, noctalia_ui_protocol_headers and
-# noctalia_ui_link_whole_dependencies.
+# Provides noctalia_ui_lib, noctalia_ui_dep and noctalia_ui_protocol_headers.
 subdir('lib')
 
 # ── Shell Wayland protocols ───────────────────────────────────────────────────
@@ -514,6 +513,8 @@ _noctalia_sources = files(
   'src/dbus/network/network_display.cpp',
   'src/dbus/network/network_manager_service.cpp',
   'src/dbus/network/network_secret_agent.cpp',
+  'src/dbus/network/network_secret_keyring.cpp',
+  'src/dbus/network/vpn_auth_dialog.cpp',
   'src/dbus/network/wpa_supplicant_service.cpp',
   'src/dbus/polkit/polkit_agent.cpp',
   'src/dbus/polkit/polkit_session_support.cpp',
@@ -546,6 +547,7 @@ _noctalia_sources = files(
   'src/launcher/dmenu_socket_path.cpp',
   'src/launcher/dmenu_stdin_provider.cpp',
   'src/launcher/emoji_provider.cpp',
+  'src/launcher/fuzzy_match.cpp',
   'src/launcher/math_provider.cpp',
   'src/launcher/panel_catalog.cpp',
   'src/launcher/panel_provider.cpp',
@@ -685,22 +687,24 @@ _noctalia_sources = files(
   'src/shell/polkit/polkit_panel.cpp',
   'src/shell/render/audio_spectrum_node.cpp',
   'src/shell/render/countdown_ring_node.cpp',
-  'src/shell/render/effect_node.cpp',
   'src/shell/render/fancy_audio_visualizer_node.cpp',
   'src/shell/render/graph_node.cpp',
   'src/shell/render/lockscreen_transition_node.cpp',
   'src/shell/render/programs/audio_spectrum_program.cpp',
   'src/shell/render/programs/countdown_ring_program.cpp',
-  'src/shell/render/programs/effect_program.cpp',
   'src/shell/render/programs/fancy_audio_visualizer_program.cpp',
   'src/shell/render/programs/graph_program.cpp',
   'src/shell/render/programs/lockscreen_transition_program.cpp',
   'src/shell/render/programs/screen_corner_program.cpp',
   'src/shell/render/programs/wallpaper_mask_program.cpp',
   'src/shell/render/programs/wallpaper_program.cpp',
+  'src/shell/render/programs/weather_effect_program.cpp',
   'src/shell/render/screen_corner_node.cpp',
   'src/shell/render/wallpaper_mask_node.cpp',
   'src/shell/render/wallpaper_node.cpp',
+  'src/shell/render/weather_effect_node.cpp',
+  'src/shell/render/weather_effect_rain_simulation.cpp',
+  'src/shell/render/weather_effect_snow_simulation.cpp',
   'src/shell/visuals/audio_visualizer.cpp',
   'src/shell/visuals/fancy_audio_visualizer.cpp',
   'src/shell/visuals/graph.cpp',
@@ -761,6 +765,22 @@ _noctalia_sources = files(
   'src/shell/wallpaper/panel/wallpaper_tile.cpp',
   'src/shell/keyboard_layout_label.cpp',
   'src/shell/app_icon_colorization_settings.cpp',
+  'src/shell/controls/color_picker.cpp',
+  'src/shell/controls/glyph_picker.cpp',
+  'src/shell/controls/markdown_view.cpp',
+  'src/shell/controls/search_picker.cpp',
+  'src/shell/dialogs/color_picker_dialog.cpp',
+  'src/shell/dialogs/color_picker_dialog_popup.cpp',
+  'src/shell/dialogs/dialog_popup_host.cpp',
+  'src/shell/dialogs/file_dialog.cpp',
+  'src/shell/dialogs/file_dialog_popup.cpp',
+  'src/shell/dialogs/file_dialog_view.cpp',
+  'src/shell/dialogs/file_entry_row.cpp',
+  'src/shell/dialogs/file_entry_tile.cpp',
+  'src/shell/dialogs/glyph_picker_dialog.cpp',
+  'src/shell/dialogs/glyph_picker_dialog_popup.cpp',
+  'src/shell/dialogs/layer_popup_host.cpp',
+  'src/shell/dialogs/search_picker_popup.cpp',
   'src/shell/bar/widget.cpp',
   'src/shell/bar/widget_action.cpp',
   'src/shell/bar/widget_action_dispatcher.cpp',
@@ -837,6 +857,7 @@ _noctalia_sources = files(
   'src/shell/bar/widgets/workspaces_widget_definition.cpp',
   'src/system/dependency_service.cpp',
   'src/system/v4l2_camera.cpp',
+  'src/system/directory_scanner.cpp',
   'src/system/desktop_entry.cpp',
   'src/system/freedesktop_key_file.cpp',
   'src/system/desktop_entry_launch.cpp',
@@ -878,6 +899,7 @@ _noctalia_sources = files(
   'src/system/system_monitor_service.cpp',
   'src/system/weather_service.cpp',
   'src/time/time_service.cpp',
+  'src/time/time_format.cpp',
   'src/shell/calendar/calendar_view.cpp',
   'src/scripting/ui/pixel_stream_view.cpp',
   'src/scripting/ui/ui_tree_reconciler.cpp',
@@ -1024,17 +1046,20 @@ _noctalia_system_dependencies = [
   nlohmann_dep,
   libxml2_dep,
   libical_dep,
+  md4c_dep,
   tomlplusplus_dep,
   libwebp_dep,
   sndfile_dep,
 ] + jemalloc_deps + (dl_dep.found() ? [dl_dep] : [])
 
 _noctalia_dependencies = _noctalia_system_dependencies + [
+  fzy_dep,
   mcu_dep,
   luau_dep,
 ]
 
 _noctalia_test_dependencies = _noctalia_system_dependencies + [
+  _fzy_selective_dep,
   _mcu_selective_dep,
   _luau_selective_dep,
   noctalia_ui_dep,
@@ -1060,7 +1085,7 @@ noctalia_core_dep = declare_dependency(
 
 noctalia_exe = executable('noctalia',
   sources: files('src/main.cpp') + _protocol_headers,
-  dependencies: _noctalia_dependencies + noctalia_ui_link_whole_dependencies + [noctalia_ui_dep],
+  dependencies: _noctalia_dependencies + [noctalia_ui_dep],
   include_directories: _noctalia_inc,
   cpp_args: _noctalia_cpp_args,
   objects: [
@@ -1070,9 +1095,21 @@ noctalia_exe = executable('noctalia',
   install: true,
 )
 
+noctalia_session_config = configuration_data()
+noctalia_session_config.set(
+  'NOCTALIA_EXECUTABLE',
+  get_option('prefix') / get_option('bindir') / 'noctalia',
+)
+configure_file(
+  input: 'assets/noctalia.service.in',
+  output: 'noctalia.service',
+  configuration: noctalia_session_config,
+  install_dir: get_option('datadir') / 'noctalia' / 'assets',
+)
+
 install_subdir('assets',
   install_dir: get_option('datadir') / 'noctalia',
-  exclude_files: ['dev.noctalia.Noctalia.desktop', 'dev.noctalia.Noctalia.Annotator.desktop'],
+  exclude_files: ['dev.noctalia.Noctalia.desktop', 'dev.noctalia.Noctalia.Annotator.desktop', 'noctalia.service.in'],
 )
 
 install_data(
@@ -1119,7 +1156,6 @@ if build_tests
     'log',
     'process',
     'string_utils',
-    'time_format',
     'virtual_grid_view_gesture',
     'wayland_output_scale',
     'webp_decoder',
@@ -1206,6 +1242,7 @@ if build_tests
     'monitor_selector',
     'network_display',
     'network_manager_security',
+    'network_secret_keyring',
     'niri_workspace_backend',
     'notification_dnd',
     'notification_filter',
@@ -1251,6 +1288,7 @@ if build_tests
     'template_hook_async',
     'template_hook_runner',
     'theme_shell_mode',
+    'time_format',
     'toplevel_thumbnail_capture',
     'tray_identifier',
     'tray_theme_path_index',
@@ -1260,6 +1298,7 @@ if build_tests
     'uri',
     'v4l2_camera',
     'vdir_reader',
+    'vpn_auth_dialog',
     'wallpaper_scan_symlink',
     'wallpaper_shuffle_state',
     'wayland_toplevels_identity',
